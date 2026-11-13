@@ -23,6 +23,13 @@ export interface DatosLibroEditables {
 export interface BibliotecaContextType {
   libros: Libro[]
 
+  cargando: boolean
+
+  error: string
+
+  recargarCatalogo:
+    () => Promise<void>
+
   cambiarEstadoEjemplar: (
     nea: string,
     nuevoEstado: EstadoEjemplar,

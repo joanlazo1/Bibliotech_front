@@ -1,20 +1,39 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router'
+import {
+  StrictMode,
+} from 'react'
+
+import {
+  createRoot,
+} from 'react-dom/client'
+
+import {
+  BrowserRouter,
+} from 'react-router'
 
 import './index.css'
+
 import App from './App'
 
-import { BibliotecaProvider } from './context/BibliotecaProvider'
+import {
+  BibliotecaProvider,
+} from './context/BibliotecaProvider'
+
+import {
+  AuthProvider,
+} from './context/AuthProvider'
 
 createRoot(
-  document.getElementById('root')!,
+  document.getElementById(
+    'root',
+  )!,
 ).render(
   <StrictMode>
     <BrowserRouter>
-      <BibliotecaProvider>
-        <App />
-      </BibliotecaProvider>
+      <AuthProvider>
+        <BibliotecaProvider>
+          <App />
+        </BibliotecaProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

@@ -5,6 +5,8 @@ import {
 
 import PublicLayout from './layouts/PublicLayout'
 
+import RutaProtegida from './components/RutaProtegida'
+
 import Home from './pages/Home'
 import Catalogo from './pages/Catalogo'
 import DetalleLibro from './pages/DetalleLibro'
@@ -17,47 +19,65 @@ function App() {
   return (
     <Routes>
       <Route
-        element={<PublicLayout />}
+        element={
+          <PublicLayout />
+        }
       >
         <Route
           path="/"
-          element={<Home />}
+          element={
+            <Home />
+          }
         />
 
         <Route
           path="/catalogo"
-          element={<Catalogo />}
+          element={
+            <Catalogo />
+          }
         />
 
         <Route
           path="/libro/:id"
-          element={<DetalleLibro />}
+          element={
+            <DetalleLibro />
+          }
         />
       </Route>
 
       <Route
         path="/login"
-        element={<Login />}
-      />
-
-      <Route
-        path="/admin"
-        element={<PanelAdmin />}
-      />
-
-      <Route
-        path="/admin/catalogo"
         element={
-          <GestionCatalogo />
+          <Login />
         }
       />
 
       <Route
-        path="/consulta-sala"
         element={
-          <ConsultaSala />
+          <RutaProtegida />
         }
-      />
+      >
+        <Route
+          path="/admin"
+          element={
+            <PanelAdmin />
+          }
+        />
+
+        <Route
+          path="/admin/catalogo"
+          element={
+            <GestionCatalogo />
+          }
+        />
+
+        <Route
+          path="/consulta-sala"
+          element={
+            <ConsultaSala />
+          }
+        />
+      </Route>
     </Routes>
   )
 }

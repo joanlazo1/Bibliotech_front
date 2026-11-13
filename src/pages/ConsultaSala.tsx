@@ -15,6 +15,15 @@ import { Link } from 'react-router'
 
 import { useBiblioteca } from '../context/useBiblioteca'
 
+import {
+  agregarEjemplarConsultaApi,
+  finalizarConsultaApi,
+  iniciarConsultaApi,
+  marcarEjemplarDisponibleApi,
+  obtenerConsultaApi,
+  type ConsultaDetalleApi,
+} from '../services/bibliotecaApi'
+
 type TipoIdentificacion =
   | 'Carné de biblioteca'
   | 'DNI'
@@ -22,7 +31,7 @@ type TipoIdentificacion =
 function ConsultaSala() {
   const {
     buscarEjemplarPorNea,
-    cambiarEstadoEjemplar,
+    recargarCatalogo,
   } = useBiblioteca()
 
   const [
@@ -38,9 +47,12 @@ function ConsultaSala() {
   ] = useState('')
 
   const [
-    consultaActiva,
-    setConsultaActiva,
-  ] = useState(false)
+    consulta,
+    setConsulta,
+  ] =
+    useState<ConsultaDetalleApi | null>(
+      null,
+    )
 
   const [nea, setNea] =
     useState('')
@@ -50,21 +62,44 @@ function ConsultaSala() {
     setNeaEncontrado,
   ] = useState<string | null>(null)
 
-  const [
-    ejemplaresEnConsulta,
-    setEjemplaresEnConsulta,
-  ] = useState<string[]>([])
-
   const [mensaje, setMensaje] =
     useState('')
 
-  const resultado = neaEncontrado
-    ? buscarEjemplarPorNea(
-        neaEncontrado,
-      )
-    : null
+  const [procesando, setProcesando] =
+    useState(false)
 
-  const iniciarConsulta = (
+  const resultado =
+    neaEncontrado
+      ? buscarEjemplarPorNea(
+          neaEncontrado,
+        )
+      : null
+
+  const consultaActiva =
+    consulta?.consulta.estado ===
+    'Activa'
+
+  const ejemplaresEnUso =
+    consulta?.ejemplares.filter(
+      (ejemplar) =>
+        ejemplar.activo_en_consulta,
+    ) ?? []
+
+  const recargarConsulta =
+    async (
+      consultaId:
+        | string
+        | number,
+    ) => {
+      const datos =
+        await obtenerConsultaApi(
+          consultaId,
+        )
+
+      setConsulta(datos)
+    }
+
+  const iniciarConsulta = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault()
@@ -80,7 +115,8 @@ function ConsultaSala() {
     }
 
     if (
-      tipoIdentificacion === 'DNI' &&
+      tipoIdentificacion ===
+        'DNI' &&
       !/^\d{8}$/.test(
         identificacion,
       )
@@ -91,11 +127,38 @@ function ConsultaSala() {
       return
     }
 
-    setConsultaActiva(true)
+    try {
+      setProcesando(true)
+      setMensaje('')
 
-    setMensaje(
-      'Consulta iniciada correctamente.',
-    )
+      const tipoApi =
+        tipoIdentificacion ===
+        'DNI'
+          ? 'DNI'
+          : 'CARNET'
+
+      const consultaIniciada =
+        await iniciarConsultaApi(
+          tipoApi,
+          identificacion,
+        )
+
+      await recargarConsulta(
+        consultaIniciada.id,
+      )
+
+      setMensaje(
+        'Consulta iniciada correctamente.',
+      )
+    } catch (error) {
+      setMensaje(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo iniciar la consulta.',
+      )
+    } finally {
+      setProcesando(false)
+    }
   }
 
   const buscarEjemplar = (
@@ -103,7 +166,8 @@ function ConsultaSala() {
   ) => {
     event.preventDefault()
 
-    const codigo = nea.trim()
+    const codigo =
+      nea.trim()
 
     if (!codigo) {
       setNeaEncontrado(null)
@@ -116,7 +180,9 @@ function ConsultaSala() {
     }
 
     const ejemplar =
-      buscarEjemplarPorNea(codigo)
+      buscarEjemplarPorNea(
+        codigo,
+      )
 
     if (!ejemplar) {
       setNeaEncontrado(null)
@@ -135,93 +201,125 @@ function ConsultaSala() {
     setMensaje('')
   }
 
-  const agregarEjemplar = () => {
-    if (!resultado) {
-      return
+  const agregarEjemplar =
+    async () => {
+      if (
+        !resultado ||
+        !consulta
+      ) {
+        return
+      }
+
+      if (
+        resultado.estado !==
+        'Disponible'
+      ) {
+        setMensaje(
+          `El ejemplar NEA ${resultado.nea} ya se encuentra en uso.`,
+        )
+
+        return
+      }
+
+      try {
+        setProcesando(true)
+
+        await agregarEjemplarConsultaApi(
+          consulta.consulta.id,
+          resultado.nea,
+        )
+
+        await recargarCatalogo()
+
+        await recargarConsulta(
+          consulta.consulta.id,
+        )
+
+        setNea('')
+        setNeaEncontrado(null)
+
+        setMensaje(
+          `El ejemplar NEA ${resultado.nea} fue agregado a la consulta.`,
+        )
+      } catch (error) {
+        setMensaje(
+          error instanceof Error
+            ? error.message
+            : 'No se pudo agregar el ejemplar.',
+        )
+      } finally {
+        setProcesando(false)
+      }
     }
 
-    if (
-      resultado.estado !==
-      'Disponible'
-    ) {
-      setMensaje(
-        `El ejemplar NEA ${resultado.nea} ya se encuentra en uso.`,
-      )
+  const marcarComoDisponible =
+    async (
+      codigoNea: string,
+    ) => {
+      if (!consulta) {
+        return
+      }
 
-      return
+      try {
+        setProcesando(true)
+
+        await marcarEjemplarDisponibleApi(
+          codigoNea,
+        )
+
+        await recargarCatalogo()
+
+        await recargarConsulta(
+          consulta.consulta.id,
+        )
+
+        setMensaje(
+          `El ejemplar NEA ${codigoNea} fue marcado como disponible.`,
+        )
+      } catch (error) {
+        setMensaje(
+          error instanceof Error
+            ? error.message
+            : 'No se pudo actualizar el ejemplar.',
+        )
+      } finally {
+        setProcesando(false)
+      }
     }
 
-    cambiarEstadoEjemplar(
-      resultado.nea,
-      'En uso',
-    )
+  const finalizarConsulta =
+    async () => {
+      if (!consulta) {
+        return
+      }
 
-    setEjemplaresEnConsulta(
-      (actuales) => [
-        ...actuales,
-        resultado.nea,
-      ],
-    )
+      try {
+        setProcesando(true)
 
-    setMensaje(
-      `El ejemplar NEA ${resultado.nea} fue agregado a la consulta.`,
-    )
+        await finalizarConsultaApi(
+          consulta.consulta.id,
+        )
 
-    setNea('')
-    setNeaEncontrado(null)
-  }
+        await recargarCatalogo()
 
-  const marcarComoDisponible = (
-    codigoNea: string,
-  ) => {
-    cambiarEstadoEjemplar(
-      codigoNea,
-      'Disponible',
-    )
+        setConsulta(null)
+        setNumeroIdentificacion('')
+        setNea('')
+        setNeaEncontrado(null)
 
-    setEjemplaresEnConsulta(
-      (actuales) =>
-        actuales.filter(
-          (codigo) =>
-            codigo !== codigoNea,
-        ),
-    )
-
-    setMensaje(
-      `El ejemplar NEA ${codigoNea} fue marcado como disponible.`,
-    )
-
-    if (
-      neaEncontrado === codigoNea
-    ) {
-      setNeaEncontrado(
-        codigoNea,
-      )
+        setMensaje(
+          'Consulta finalizada correctamente.',
+        )
+      } catch (error) {
+        setMensaje(
+          error instanceof Error
+            ? error.message
+            : 'No se pudo finalizar la consulta.',
+        )
+      } finally {
+        setProcesando(false)
+      }
     }
-  }
-
-  const finalizarConsulta = () => {
-    if (
-      ejemplaresEnConsulta.length >
-      0
-    ) {
-      setMensaje(
-        'Debes marcar como disponibles todos los ejemplares de esta consulta antes de finalizarla.',
-      )
-
-      return
-    }
-
-    setConsultaActiva(false)
-
-    setNumeroIdentificacion('')
-    setNea('')
-    setNeaEncontrado(null)
-
-    setMensaje(
-      'Consulta finalizada correctamente.',
-    )
-  }
 
   return (
     <main className="room-page">
@@ -291,6 +389,9 @@ function ConsultaSala() {
                     value={
                       tipoIdentificacion
                     }
+                    disabled={
+                      procesando
+                    }
                     onChange={(
                       event,
                     ) => {
@@ -335,6 +436,9 @@ function ConsultaSala() {
                     value={
                       numeroIdentificacion
                     }
+                    disabled={
+                      procesando
+                    }
                     maxLength={
                       tipoIdentificacion ===
                       'DNI'
@@ -356,8 +460,13 @@ function ConsultaSala() {
               <button
                 type="submit"
                 className="room-start-button"
+                disabled={
+                  procesando
+                }
               >
-                Iniciar consulta
+                {procesando
+                  ? 'Procesando...'
+                  : 'Iniciar consulta'}
               </button>
             </form>
           </section>
@@ -390,6 +499,9 @@ function ConsultaSala() {
               <button
                 type="button"
                 className="room-finish-button"
+                disabled={
+                  procesando
+                }
                 onClick={
                   finalizarConsulta
                 }
@@ -424,6 +536,9 @@ function ConsultaSala() {
                     type="search"
                     placeholder="Ej. 10001"
                     value={nea}
+                    disabled={
+                      procesando
+                    }
                     onChange={(
                       event,
                     ) =>
@@ -435,7 +550,12 @@ function ConsultaSala() {
                   />
                 </div>
 
-                <button type="submit">
+                <button
+                  type="submit"
+                  disabled={
+                    procesando
+                  }
+                >
                   Buscar
                 </button>
               </form>
@@ -499,6 +619,9 @@ function ConsultaSala() {
                   <button
                     type="button"
                     className="room-action-button"
+                    disabled={
+                      procesando
+                    }
                     onClick={
                       agregarEjemplar
                     }
@@ -509,6 +632,9 @@ function ConsultaSala() {
                   <button
                     type="button"
                     className="room-action-button"
+                    disabled={
+                      procesando
+                    }
                     onClick={() =>
                       marcarComoDisponible(
                         resultado.nea,
@@ -537,12 +663,12 @@ function ConsultaSala() {
 
                 <span className="room-current-count">
                   {
-                    ejemplaresEnConsulta.length
+                    ejemplaresEnUso.length
                   }
                 </span>
               </div>
 
-              {ejemplaresEnConsulta.length ===
+              {ejemplaresEnUso.length ===
               0 ? (
                 <div className="room-current-empty">
                   <BookOpen
@@ -557,65 +683,51 @@ function ConsultaSala() {
                 </div>
               ) : (
                 <div className="room-current-list">
-                  {ejemplaresEnConsulta.map(
-                    (codigoNea) => {
-                      const ejemplar =
-                        buscarEjemplarPorNea(
-                          codigoNea,
-                        )
+                  {ejemplaresEnUso.map(
+                    (ejemplar) => (
+                      <article
+                        className="room-current-item"
+                        key={
+                          ejemplar.nea
+                        }
+                      >
+                        <div>
+                          <strong>
+                            {
+                              ejemplar.titulo
+                            }
+                          </strong>
 
-                      if (
-                        !ejemplar
-                      ) {
-                        return null
-                      }
+                          <p>
+                            {
+                              ejemplar.autor
+                            }
+                          </p>
 
-                      return (
-                        <article
-                          className="room-current-item"
-                          key={
-                            codigoNea
+                          <span>
+                            NEA{' '}
+                            {
+                              ejemplar.nea
+                            }
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={
+                            procesando
+                          }
+                          onClick={() =>
+                            marcarComoDisponible(
+                              ejemplar.nea,
+                            )
                           }
                         >
-                          <div>
-                            <strong>
-                              {
-                                ejemplar
-                                  .libro
-                                  .titulo
-                              }
-                            </strong>
-
-                            <p>
-                              {
-                                ejemplar
-                                  .libro
-                                  .autor
-                              }
-                            </p>
-
-                            <span>
-                              NEA{' '}
-                              {
-                                ejemplar.nea
-                              }
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              marcarComoDisponible(
-                                codigoNea,
-                              )
-                            }
-                          >
-                            Marcar como
-                            disponible
-                          </button>
-                        </article>
-                      )
-                    },
+                          Marcar como
+                          disponible
+                        </button>
+                      </article>
+                    ),
                   )}
                 </div>
               )}

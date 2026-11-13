@@ -4,11 +4,25 @@ import {
   User,
 } from 'lucide-react'
 
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import {
+  useState,
+  type FormEvent,
+} from 'react'
+
+import {
+  Link,
+  useNavigate,
+} from 'react-router'
+
+import { useAuth } from '../context/useAuth'
 
 function Login() {
-  const navigate = useNavigate()
+  const navigate =
+    useNavigate()
+
+  const {
+    iniciarSesion,
+  } = useAuth()
 
   const [usuario, setUsuario] =
     useState('')
@@ -19,28 +33,60 @@ function Login() {
   const [error, setError] =
     useState('')
 
-  const iniciarSesion = (
-    event: React.FormEvent<HTMLFormElement>,
-  ) => {
-    event.preventDefault()
+  const [
+    procesando,
+    setProcesando,
+  ] = useState(false)
 
-    if (
-      !usuario.trim() ||
-      !password.trim()
-    ) {
-      setError(
-        'Ingresa tu usuario y contraseña.',
-      )
+  const manejarInicioSesion =
+    async (
+      event:
+        FormEvent<HTMLFormElement>,
+    ) => {
+      event.preventDefault()
 
-      return
+      const usuarioLimpio =
+        usuario.trim()
+
+      const passwordLimpio =
+        password.trim()
+
+      if (
+        !usuarioLimpio ||
+        !passwordLimpio
+      ) {
+        setError(
+          'Ingresa tu usuario y contraseña.',
+        )
+
+        return
+      }
+
+      try {
+        setProcesando(true)
+        setError('')
+
+        await iniciarSesion(
+          usuarioLimpio,
+          passwordLimpio,
+        )
+
+        navigate(
+          '/admin',
+          {
+            replace: true,
+          },
+        )
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'No se pudo iniciar sesión.',
+        )
+      } finally {
+        setProcesando(false)
+      }
     }
-
-    setError('')
-
-    // Temporal:
-    // posteriormente será validado por el backend.
-    navigate('/admin')
-  }
 
   return (
     <main className="login-page">
@@ -69,7 +115,9 @@ function Login() {
         </p>
 
         <form
-          onSubmit={iniciarSesion}
+          onSubmit={
+            manejarInicioSesion
+          }
           className="login-form"
         >
           <label>
@@ -81,6 +129,10 @@ function Login() {
               <input
                 type="text"
                 value={usuario}
+                disabled={
+                  procesando
+                }
+                autoComplete="username"
                 onChange={(event) =>
                   setUsuario(
                     event.target.value,
@@ -95,11 +147,17 @@ function Login() {
             Contraseña
 
             <div className="login-input">
-              <LockKeyhole size={18} />
+              <LockKeyhole
+                size={18}
+              />
 
               <input
                 type="password"
                 value={password}
+                disabled={
+                  procesando
+                }
+                autoComplete="current-password"
                 onChange={(event) =>
                   setPassword(
                     event.target.value,
@@ -116,8 +174,15 @@ function Login() {
             </p>
           )}
 
-          <button type="submit">
-            Ingresar
+          <button
+            type="submit"
+            disabled={
+              procesando
+            }
+          >
+            {procesando
+              ? 'Ingresando...'
+              : 'Ingresar'}
           </button>
         </form>
 

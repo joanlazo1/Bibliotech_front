@@ -1,9 +1,10 @@
 import {
+  useCallback,
+  useEffect,
   useState,
   type ReactNode,
 } from 'react'
 
-import { libros as librosIniciales } from '../data/libros'
 import type { Libro } from '../types/Libro'
 
 import {
@@ -13,6 +14,10 @@ import {
   type EstadoEjemplar,
 } from './BibliotecaContext'
 
+import {
+  obtenerCatalogoApi,
+} from '../services/bibliotecaApi'
+
 interface BibliotecaProviderProps {
   children: ReactNode
 }
@@ -21,7 +26,74 @@ export function BibliotecaProvider({
   children,
 }: BibliotecaProviderProps) {
   const [libros, setLibros] =
-    useState<Libro[]>(librosIniciales)
+    useState<Libro[]>([])
+
+  const [cargando, setCargando] =
+    useState(true)
+
+  const [error, setError] =
+    useState('')
+
+  const recargarCatalogo =
+    useCallback(async () => {
+      try {
+        setCargando(true)
+
+        const catalogo =
+          await obtenerCatalogoApi()
+
+        setLibros(catalogo)
+        setError('')
+      } catch (error) {
+        console.error(
+          'Error cargando catálogo:',
+          error,
+        )
+
+        setError(
+          'No se pudo conectar con el servidor de Bibliotech.',
+        )
+      } finally {
+        setCargando(false)
+      }
+    }, [])
+
+  useEffect(() => {
+    let cancelado = false
+
+    async function cargarCatalogoInicial() {
+      try {
+        const catalogo =
+          await obtenerCatalogoApi()
+
+        if (!cancelado) {
+          setLibros(catalogo)
+          setError('')
+        }
+      } catch (error) {
+        console.error(
+          'Error cargando catálogo:',
+          error,
+        )
+
+        if (!cancelado) {
+          setError(
+            'No se pudo conectar con el servidor de Bibliotech.',
+          )
+        }
+      } finally {
+        if (!cancelado) {
+          setCargando(false)
+        }
+      }
+    }
+
+    void cargarCatalogoInicial()
+
+    return () => {
+      cancelado = true
+    }
+  }, [])
 
   const buscarEjemplarPorNea = (
     nea: string,
@@ -33,7 +105,8 @@ export function BibliotecaProvider({
       const ejemplar =
         libro.ejemplares.find(
           (item) =>
-            item.nea.toLowerCase() ===
+            item.nea
+              .toLowerCase() ===
             codigo,
         )
 
@@ -66,20 +139,23 @@ export function BibliotecaProvider({
     }
 
     setLibros((librosActuales) =>
-      librosActuales.map((libro) => ({
-        ...libro,
+      librosActuales.map(
+        (libro) => ({
+          ...libro,
 
-        ejemplares:
-          libro.ejemplares.map(
-            (ejemplar) =>
-              ejemplar.nea === nea
-                ? {
-                    ...ejemplar,
-                    estado: nuevoEstado,
-                  }
-                : ejemplar,
-          ),
-      })),
+          ejemplares:
+            libro.ejemplares.map(
+              (ejemplar) =>
+                ejemplar.nea === nea
+                  ? {
+                      ...ejemplar,
+                      estado:
+                        nuevoEstado,
+                    }
+                  : ejemplar,
+            ),
+        }),
+      ),
     )
 
     return true
@@ -99,16 +175,17 @@ export function BibliotecaProvider({
       return false
     }
 
-    setLibros((librosActuales) =>
-      librosActuales.map(
-        (libro) =>
-          libro.id === id
-            ? {
-                ...libro,
-                ...datos,
-              }
-            : libro,
-      ),
+    setLibros(
+      (librosActuales) =>
+        librosActuales.map(
+          (libro) =>
+            libro.id === id
+              ? {
+                  ...libro,
+                  ...datos,
+                }
+              : libro,
+        ),
     )
 
     return true
@@ -118,6 +195,9 @@ export function BibliotecaProvider({
     <BibliotecaContext.Provider
       value={{
         libros,
+        cargando,
+        error,
+        recargarCatalogo,
         cambiarEstadoEjemplar,
         buscarEjemplarPorNea,
         actualizarLibro,

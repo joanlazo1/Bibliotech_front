@@ -1,17 +1,33 @@
-import { BookOpen, MapPin } from 'lucide-react'
-import { Link } from 'react-router'
-import type { Libro } from '../types/Libro'
+import {
+  MapPin,
+} from 'lucide-react'
+
+import {
+  Link,
+} from 'react-router'
+
+import type {
+  Libro,
+} from '../types/Libro'
+
+import BookCover from './BookCover'
 
 interface BookCardProps {
   book: Libro
 }
 
-function BookCard({ book }: BookCardProps) {
-  const totalEjemplares = book.ejemplares.length
+function BookCard({
+  book,
+}: BookCardProps) {
+  const totalEjemplares =
+    book.ejemplares.length
 
-  const disponibles = book.ejemplares.filter(
-    (ejemplar) => ejemplar.estado === 'Disponible',
-  ).length
+  const disponibles =
+    book.ejemplares.filter(
+      (ejemplar) =>
+        ejemplar.estado ===
+        'Disponible',
+    ).length
 
   return (
     <Link
@@ -19,37 +35,25 @@ function BookCard({ book }: BookCardProps) {
       className="book-card-link"
     >
       <article className="book-card">
-        {book.portada ? (
-          <div className="book-cover">
-            <img
-              src={book.portada}
-              alt={`Portada de ${book.titulo}`}
-            />
-          </div>
-        ) : (
-          <div
-            className={`book-cover generated-cover ${book.color ?? 'blue'}`}
-          >
-            <span className="book-category-cover">
-              {book.categoria.toUpperCase()}
-            </span>
+        <BookCover
+          titulo={
+            book.titulo
+          }
+          autor={
+            book.autor
+          }
+          categoria={
+            book.categoria
+          }
+          portada={
+            book.portada
+          }
+        />
 
-            <div className="generated-book-content">
-              <BookOpen size={25} />
-
-              <h3>{book.titulo}</h3>
-
-              <p>{book.autor}</p>
-            </div>
-
-            <span className="library-mark">
-              BIBLIOTECA MUNICIPAL
-            </span>
-          </div>
-        )}
-
-        <div className="book-info">
-          <h3>{book.titulo}</h3>
+        <div className="book-card-content">
+          <h3>
+            {book.titulo}
+          </h3>
 
           <p className="book-author">
             {book.autor}
@@ -60,30 +64,36 @@ function BookCard({ book }: BookCardProps) {
           </span>
 
           <div className="book-location">
-            <MapPin size={16} />
+            <MapPin size={14} />
 
             <span>
-              {book.ubicacion}
+              {book.ubicacion ||
+                'Ubicación no registrada'}
             </span>
           </div>
+        </div>
 
-          <div className="book-availability">
-            <span className="available">
-              <span className="green-dot" />
+        <div className="book-card-footer">
+          <span
+            className={
+              disponibles > 0
+                ? 'book-available'
+                : 'book-unavailable'
+            }
+          >
+            <span className="availability-dot" />
 
-              {disponibles}{' '}
-              {disponibles === 1
-                ? 'disponible'
-                : 'disponibles'}
-            </span>
+            {disponibles === 1
+              ? '1 disponible'
+              : `${disponibles} disponibles`}
+          </span>
 
-            <span>
-              {totalEjemplares}{' '}
-              {totalEjemplares === 1
-                ? 'ejemplar'
-                : 'ejemplares'}
-            </span>
-          </div>
+          <span className="book-copy-total">
+            {totalEjemplares ===
+            1
+              ? '1 ejemplar'
+              : `${totalEjemplares} ejemplares`}
+          </span>
         </div>
       </article>
     </Link>
